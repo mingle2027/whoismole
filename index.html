@@ -1,0 +1,163 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>谁是卧底在线版</title>
+    <!-- SocketIO 库 -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/4.0.1/socket.io.js"></script>
+    <style>
+        body { 
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+            text-align: center; 
+            padding: 20px; 
+            background-color: #f2f2f2;
+            touch-action: manipulation; /* 优化手机点击 */
+        }
+        .container { 
+            background: white; 
+            padding: 25px; 
+            border-radius: 15px; 
+            box-shadow: 0 4px 15px rgba(0,0,0,0.1); 
+            max-width: 500px; 
+            margin: 0 auto; 
+        }
+        input { 
+            padding: 12px; 
+            width: 80%; 
+            margin: 10px 0; 
+            border: 1px solid #ddd; 
+            border-radius: 8px; 
+            font-size: 16px; 
+        }
+        button { 
+            width: 90%;
+            padding: 15px; 
+            background-color: #07c160; /* 微信绿 */
+            color: white; 
+            border: none; 
+            border-radius: 8px; 
+            font-size: 18px; 
+            font-weight: bold;
+            cursor: pointer; 
+            margin-top: 10px;
+        }
+        button.red { background-color: #fa5151; }
+        #gameArea, #wordArea { display: none; }
+        ul { list-style: none; padding: 0; margin: 20px 0; }
+        li { 
+            padding: 10px; 
+            background: #f9f9f9; 
+            margin-bottom: 5px; 
+            border-radius: 5px;
+            font-size: 16px;
+        }
+        .big-word { 
+            font-size: 40px; 
+            font-weight: bold; 
+            color: #333; 
+            margin: 30px 0; 
+            border: 2px dashed #07c160;
+            padding: 20px;
+            background: #f0fff4;
+        }
+        .tip { font-size: 12px; color: #888; margin-top: 20px; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h2>🕵️ 谁是卧底</h2>
+        
+        <div id="loginArea">
+            <input type="text" id="username" placeholder="输入你的昵称">
+            <input type="text" id="room" placeholder="输入房间号 (仅数字，如: 666)" value="666">
+            <button onclick="joinGame()">加入游戏</button>
+            <p class="tip">大家要输入同一个房间号才能一起玩哦</p>
+        </div>
+        
+        <div id="gameArea">
+            <h3>🏠 房间: <span id="roomDisplay"></span></h3>
+            <p>已加入玩家 (<span id="count">0</span>):</p>
+            <ul id="playerList"></ul>
+            <button onclick="startGame()">🎮 房主点击：开始发牌（仅一人点！）</button>
+            <p class="tip">至少3人才能开始，等人齐了再点哦～</p>
+        </div>
+        
+        <div id="wordArea">
+            <h3>🤫 你的词语是：</h3>
+            <div id="secretWord" class="big-word">???</div>
+            <p style="color:#fa5151;">⚠️ 退出浏览器后词语会消失，建议截屏保存！</p>
+            <button class="red" onclick="resetGame()">🔄 重置 / 下一局</button>
+        </div>
+    </div>
+
+    <script>
+        // 关键：替换成你的Python Anywhere后端地址！
+        const socket = io("https://[你的用户名].pythonanywhere.com"); 
+        let myName = "";
+        let myRoom = "";
+
+        function joinGame() {
+            myName = document.getElementById('username').value.trim();
+            myRoom = document.getElementById('room').value.trim();
+            
+            // 校验昵称和房间号
+            if(!myName) return alert("先起个昵称吧～");
+            if(!/^\d+$/.test(myRoom)) return alert("房间号只能是数字哦！");
+            
+            socket.emit('join', {username: myName, room: myRoom});
+            
+            // 切换界面
+            document.getElementById('loginArea').style.display = 'none';
+            document.getElementById('gameArea').style.display = 'block';
+            document.getElementById('roomDisplay').innerText = myRoom;
+        }
+
+        // 更新玩家列表
+        socket.on('update_players', (data) => {
+            const list = document.getElementById('playerList');
+            list.innerHTML = "";
+            data.players.forEach(p => {
+                list.innerHTML += `<li>👤 ${p}</li>`;
+            });
+            document.getElementById('count').innerText = data.players.length;
+        });
+
+        // 开始游戏
+        function startGame() {
+            socket.emit('start_game', {room: myRoom});
+        }
+
+        // 游戏开始，显示词语
+        socket.on('game_started', () => {
+            document.getElementById('gameArea').style.display = 'none';
+            document.getElementById('wordArea').style.display = 'block';
+            socket.emit('get_word', {username: myName, room: myRoom});
+        });
+
+        // 显示自己的词语
+        socket.on('show_word', (data) => {
+            document.getElementById('secretWord').innerText = data.word;
+        });
+
+        // 错误提示
+        socket.on('error_msg', (data) => {
+            alert(data.msg);
+        });
+
+        // 重置游戏
+        function resetGame() {
+            if(confirm("确定要重新开始下一局吗？")) {
+                socket.emit('reset', {room: myRoom});
+            }
+        }
+
+        // 接收重置指令，切回游戏界面
+        socket.on('reset_game', () => {
+            document.getElementById('wordArea').style.display = 'none';
+            document.getElementById('gameArea').style.display = 'block';
+            document.getElementById('secretWord').innerText = "???";
+        });
+    </script>
+</body>
+</html>
