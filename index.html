@@ -62,11 +62,14 @@
             background: #f0fff4;
         }
         .tip { font-size: 12px; color: #888; margin-top: 20px; }
+        .error-tip { color: #fa5151; font-size: 14px; margin: 10px 0; display: none; }
     </style>
 </head>
 <body>
     <div class="container">
         <h2>🕵️ 谁是卧底</h2>
+        <!-- 新增连接失败提示 -->
+        <div class="error-tip" id="connectError">❌ 连接游戏服务器失败，请刷新页面重试！</div>
         
         <div id="loginArea">
             <input type="text" id="username" placeholder="输入你的昵称">
@@ -92,10 +95,22 @@
     </div>
 
     <script>
-        // 关键：替换成你的Python Anywhere后端地址！
-        const socket = io("https://MingJin.pythonanywhere.com"); 
+        // 关键：修正为全小写的后端地址！
+        const socket = io("https://mingjin.pythonanywhere.com", {
+            // 增加连接超时配置
+            timeout: 5000,
+            reconnection: true
+        }); 
         let myName = "";
         let myRoom = "";
+
+        // 新增：连接失败提示
+        socket.on('connect_error', () => {
+            document.getElementById('connectError').style.display = 'block';
+        });
+        socket.on('connect', () => {
+            document.getElementById('connectError').style.display = 'none';
+        });
 
         function joinGame() {
             myName = document.getElementById('username').value.trim();
